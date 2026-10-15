@@ -4,7 +4,9 @@ import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
+
+from app.detectors import detect_sql_injection
 
 
 class WAFMiddleware(BaseHTTPMiddleware):
@@ -13,6 +15,18 @@ class WAFMiddleware(BaseHTTPMiddleware):
         start_time = time.perf_counter()
 
         request.state.request_id = request_id
+
+        for key, value in request.query_params.multi_items():
+            if detect_sql_injection(value):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "error": "Request blocked by WAF",
+                        "reason": "Suspicious SQL injection pattern",
+                        "request_id": request_id,
+                    },
+                    headers={"X-Request-ID": request_id},
+                )
 
         response = await call_next(request)
 
