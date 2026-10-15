@@ -20,3 +20,11 @@ async def health_check():
 @app.get("/")
 async def home():
     return {"message": "Simple WAF is running"}
+
+
+@app.get("/products")
+async def get_product(id: str = "1"):
+    return {
+        "message": "Product request successful",
+        "product_id": id,
+    }
