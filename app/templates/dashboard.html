@@ -137,6 +137,54 @@
             background: white;
             min-width: 180px;
         }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px #00000010;
+        }
+
+        .chart-row {
+            display: grid;
+            grid-template-columns: 130px 1fr 45px;
+            align-items: center;
+            gap: 12px;
+            margin: 18px 0;
+        }
+
+        .chart-track {
+            height: 18px;
+            background: #e5e7eb;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .chart-bar {
+            height: 100%;
+            background: #2563eb;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+
+        .chart-count {
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .chart-empty {
+            color: #6b7280;
+            padding: 12px 0;
+        }
+
+        @media (max-width: 500px) {
+            .chart-row {
+                grid-template-columns: 100px 1fr 35px;
+                gap: 8px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 
@@ -154,6 +202,11 @@
             <p>Blocked Requests</p>
             <h2 id="blocked-events">0</h2>
         </div>
+    </section>
+
+    <section class="chart-container">
+        <h3>Attacks by Type</h3>
+        <div id="attack-chart"></div>
     </section>
 
     <section class="table-container">
@@ -216,6 +269,53 @@
                 console.error(error);
             }
         }
+        
+        function renderAttackChart(events) {
+            const chart = document.getElementById("attack-chart");
+            const counts = {
+                "SQLI-001": 0,
+                "XSS-001": 0,
+                "RATE-001": 0
+            };
+
+            events.forEach(event => {
+                if (Object.prototype.hasOwnProperty.call(counts, event.rule_id)) {
+                    counts[event.rule_id]++;
+                }
+            });
+
+            const labels = {
+                "SQLI-001": "SQL Injection",
+                "XSS-001": "XSS",
+                "RATE-001": "Rate Limit"
+            };
+
+            const maxCount = Math.max(...Object.values(counts), 1);
+            chart.replaceChildren();
+
+            Object.entries(counts).forEach(([rule, count]) => {
+                const row = document.createElement("div");
+                row.className = "chart-row";
+
+                const label = document.createElement("span");
+                label.textContent = labels[rule];
+
+                const track = document.createElement("div");
+                track.className = "chart-track";
+
+                const bar = document.createElement("div");
+                bar.className = "chart-bar";
+                bar.style.width = `${(count / maxCount) * 100}%`;
+                track.appendChild(bar);
+
+                const number = document.createElement("span");
+                number.className = "chart-count";
+                number.textContent = count;
+
+                row.append(label, track, number);
+                chart.appendChild(row);
+            });
+        }
 
         function renderEvents() {
             const table = document.getElementById("events-table");
@@ -223,6 +323,8 @@
 
             const selectedRule = document.getElementById("rule-filter").value;
             const selectedAction = document.getElementById("action-filter").value;
+            
+            renderAttackChart(allEvents);
 
             const filteredEvents = allEvents.filter(event => {
                 const matchesRule =
