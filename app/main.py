@@ -5,6 +5,10 @@ from app.waf import WAFMiddleware
 from app.database import init_db
 from app.routes import router
 
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from starlette.requests import Request
+
 app = FastAPI(
     title="Simple WAF",
     description="A rule-based Web Application Firewall",
@@ -31,3 +35,13 @@ async def get_product(id: str = "1"):
         "message": "Product request successful",
         "product_id": id,
     }
+
+templates = Jinja2Templates(directory="app/templates")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+    )

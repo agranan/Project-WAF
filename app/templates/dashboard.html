@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple WAF Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            color: #1f2937;
+        }
+
+        h1 {
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 25px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            flex: 1;
+            box-shadow: 0 1px 4px #00000010;
+        }
+
+        .stat-card p {
+            color: #6b7280;
+            margin: 0 0 10px;
+        }
+
+        .stat-card h2 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            white-space: nowrap;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 13px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            background: #f9fafb;
+        }
+
+        .blocked {
+            color: #b91c1c;
+            background: #fee2e2;
+            padding: 5px 9px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .empty {
+            text-align: center;
+            color: #6b7280;
+            padding: 25px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 9px 15px;
+            border: none;
+            border-radius: 5px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        #status {
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        @media (max-width: 650px) {
+            body {
+                padding: 15px;
+            }
+
+            .stats {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Simple WAF</h1>
+    <p class="subtitle">Web Application Firewall — Security Monitoring</p>
+
+    <section class="stats">
+        <div class="stat-card">
+            <p>Total Events Loaded</p>
+            <h2 id="total-events">0</h2>
+        </div>
+
+        <div class="stat-card">
+            <p>Blocked Requests</p>
+            <h2 id="blocked-events">0</h2>
+        </div>
+    </section>
+
+    <section class="table-container">
+        <div class="toolbar">
+            <h3>Recent Security Events</h3>
+            <button onclick="loadEvents()">Refresh</button>
+        </div>
+
+        <p id="status">Loading events...</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp (UTC)</th>
+                    <th>Source IP</th>
+                    <th>Method</th>
+                    <th>Endpoint</th>
+                    <th>Rule</th>
+                    <th>Reason</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="events-table"></tbody>
+        </table>
+    </section>
+
+    <script>
+        async function loadEvents() {
+            const status = document.getElementById("status");
+            const table = document.getElementById("events-table");
+
+            status.textContent = "Loading events...";
+
+            try {
+                const response = await fetch("/api/events?limit=100");
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch events");
+                }
+
+                const events = await response.json();
+
+                document.getElementById("total-events").textContent =
+                    events.length;
+
+                document.getElementById("blocked-events").textContent =
+                    events.filter(event => event.action === "BLOCK").length;
+
+                table.replaceChildren();
+
+                if (events.length === 0) {
+                    const row = document.createElement("tr");
+                    const cell = document.createElement("td");
+
+                    cell.colSpan = 7;
+                    cell.className = "empty";
+                    cell.textContent = "No security events recorded yet.";
+
+                    row.appendChild(cell);
+                    table.appendChild(row);
+                } else {
+                    for (const event of events) {
+                        const row = document.createElement("tr");
+
+                        const values = [
+                            event.timestamp,
+                            event.source_ip,
+                            event.method,
+                            event.path,
+                            event.rule_id,
+                            event.reason,
+                            event.action
+                        ];
+
+                        for (let i = 0; i < values.length; i++) {
+                            const cell = document.createElement("td");
+                            cell.textContent = values[i] ?? "-";
+
+                            if (i === 6 && event.action === "BLOCK") {
+                                const badge = document.createElement("span");
+                                badge.className = "blocked";
+                                badge.textContent = "BLOCK";
+                                cell.replaceChildren(badge);
+                            }
+
+                            row.appendChild(cell);
+                        }
+
+                        table.appendChild(row);
+                    }
+                }
+
+                status.textContent =
+                    `Showing ${events.length} most recent events.`;
+            } catch (error) {
+                status.textContent =
+                    "Could not load events. Check that the FastAPI server is running.";
+                console.error(error);
+            }
+        }
+
+        loadEvents();
+    </script>
+</body>
+</html>
