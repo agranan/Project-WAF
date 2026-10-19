@@ -8,6 +8,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.detectors import detect_sql_injection
 from app.database import log_event
+from app.rate_limiter import is_rate_limited
 
 class WAFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
@@ -15,6 +16,27 @@ class WAFMiddleware(BaseHTTPMiddleware):
         start_time = time.perf_counter()
 
         request.state.request_id = request_id
+
+        if is_rate_limited(request):
+            log_event(
+                request_id=request_id,
+                source_ip=request.client.host if request.client else "unknown",
+                method=request.method,
+                path=request.url.path,
+                rule_id="RATE-001",
+                reason="Request rate limit exceeded",
+                action="BLOCK",
+            )
+
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "Too many requests",
+                    "reason": "Request rate limit exceeded",
+                    "request_id": request_id,
+                },
+                headers={"X-Request-ID": request_id},
+            )
 
         for key, value in request.query_params.multi_items():
             if detect_sql_injection(value):
