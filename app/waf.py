@@ -1,6 +1,6 @@
-
 import time
 import uuid
+from urllib.parse import parse_qs
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -14,70 +14,87 @@ class WAFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = str(uuid.uuid4())
         start_time = time.perf_counter()
-
         request.state.request_id = request_id
 
-        if is_rate_limited(request):
+        def block(rule_id: str, reason: str, status_code: int = 403):
             log_event(
                 request_id=request_id,
-                source_ip=request.client.host if request.client else "unknown",
+                source_ip=(
+                    request.client.host if request.client else "unknown"
+                ),
                 method=request.method,
                 path=request.url.path,
-                rule_id="RATE-001",
-                reason="Request rate limit exceeded",
+                rule_id=rule_id,
+                reason=reason,
                 action="BLOCK",
             )
 
             return JSONResponse(
-                status_code=429,
+                status_code=status_code,
                 content={
-                    "error": "Too many requests",
-                    "reason": "Request rate limit exceeded",
+                    "error": "Request blocked by WAF",
+                    "reason": reason,
                     "request_id": request_id,
                 },
                 headers={"X-Request-ID": request_id},
             )
 
-        for key, value in request.query_params.multi_items():
+        if is_rate_limited(request):
+            return block(
+                "RATE-001",
+                "Request rate limit exceeded",
+                status_code=429,
+            )
+
+        # Inspect query parameters.
+        for _, value in request.query_params.multi_items():
             if detect_sql_injection(value):
-                log_event(
-                    request_id=request_id,
-                    source_ip=request.client.host if request.client else "unknown",
-                    method=request.method,
-                    path=request.url.path,
-                    rule_id="SQLI-001",
-                    reason="Suspicious SQL injection pattern",
-                    action="BLOCK",
-                )
-                return JSONResponse(
-                    status_code=403,
-                    content={
-                        "error": "Request blocked by WAF",
-                        "reason": "Suspicious SQL injection pattern",
-                        "request_id": request_id,
-                    },
-                    headers={"X-Request-ID": request_id},
-                )
-            if detect_xss(value):
-                log_event(
-                    request_id=request_id,
-                    source_ip=request.client.host if request.client else "unknown",
-                    method=request.method,
-                    path=request.url.path,
-                    rule_id="XSS-001",
-                    reason="Suspicious XSS pattern",
-                    action="BLOCK",
+                return block(
+                    "SQLI-001",
+                    "Suspicious SQL injection pattern",
                 )
 
-                return JSONResponse(
-                    status_code=403,
-                    content={
-                        "error": "Request blocked by WAF",
-                        "reason": "Suspicious XSS pattern",
-                        "request_id": request_id,
-                    },
-                    headers={"X-Request-ID": request_id},
+            if detect_xss(value):
+                return block("XSS-001", "Suspicious XSS pattern")
+
+        # Inspect URL-encoded form bodies.
+        content_type = request.headers.get("content-type", "").lower()
+
+        if (
+            request.method in {"POST", "PUT", "PATCH"}
+            and content_type.startswith(
+                "application/x-www-form-urlencoded"
+            )
+        ):
+            body = await request.body()
+
+            # Avoid parsing excessively large bodies
+            if len(body) > 1_000_000:
+                return block(
+                    "BODY-001",
+                    "Request body exceeds inspection limit",
+                    status_code=413,
                 )
+
+            form_fields = parse_qs(
+                body.decode("utf-8", errors="replace"),
+                keep_blank_values=True,
+            )
+
+            for values in form_fields.values():
+                for value in values:
+                    if detect_sql_injection(value):
+                        return block(
+                            "SQLI-001",
+                            "Suspicious SQL injection pattern in form body",
+                        )
+
+                    if detect_xss(value):
+                        return block(
+                            "XSS-001",
+                            "Suspicious XSS pattern in form body",
+                        )
+
         response = await call_next(request)
 
         duration_ms = round(

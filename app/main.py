@@ -8,6 +8,7 @@ from app.routes import router
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
+from fastapi import FastAPI, Form
 
 app = FastAPI(
     title="Simple WAF",
@@ -45,3 +46,14 @@ async def dashboard(request: Request):
         request=request,
         name="dashboard.html",
     )
+
+@app.post("/login")
+async def demo_login(
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    # Demonstration endpoint only; no real authentication.
+    return {
+        "message": "Demo login request received",
+        "username": username,
+    }
