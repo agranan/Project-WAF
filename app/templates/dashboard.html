@@ -220,6 +220,8 @@
                 <option value="SQLI-001">SQL Injection</option>
                 <option value="XSS-001">XSS</option>
                 <option value="RATE-001">Rate Limit</option>
+                <option value="BODY-001">Request Body Too Large</option>
+                <option value="BODY-002">Malformed JSON</option>
             </select>
 
             <select id="action-filter" onchange="renderEvents()">
@@ -275,7 +277,9 @@
             const counts = {
                 "SQLI-001": 0,
                 "XSS-001": 0,
-                "RATE-001": 0
+                "RATE-001": 0,
+                "BODY-001": 0,
+                "BODY-002": 0
             };
 
             events.forEach(event => {
@@ -287,7 +291,9 @@
             const labels = {
                 "SQLI-001": "SQL Injection",
                 "XSS-001": "XSS",
-                "RATE-001": "Rate Limit"
+                "RATE-001": "Rate Limit",
+                "BODY-001": "Body Too Large",
+                "BODY-002": "Malformed JSON"
             };
 
             const maxCount = Math.max(...Object.values(counts), 1);

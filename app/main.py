@@ -8,8 +8,7 @@ from app.routes import router
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
-from fastapi import FastAPI, Form
-
+from fastapi import FastAPI, Form, Body
 app = FastAPI(
     title="Simple WAF",
     description="A rule-based Web Application Firewall",
@@ -56,4 +55,11 @@ async def demo_login(
     return {
         "message": "Demo login request received",
         "username": username,
+    }
+
+@app.post("/api/search")
+async def search_api(payload: dict = Body(...)):
+    return {
+        "message": "Search request received",
+        "query": payload.get("query", ""),
     }

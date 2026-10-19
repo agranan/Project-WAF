@@ -10,6 +10,19 @@ from app.detectors import detect_sql_injection, detect_xss
 from app.database import log_event
 from app.rate_limiter import is_rate_limited
 
+import json
+
+def extract_strings(value):
+    """Extract string values from nested JSON objects and arrays."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from extract_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from extract_strings(item)
+
 class WAFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = str(uuid.uuid4())
@@ -60,6 +73,7 @@ class WAFMiddleware(BaseHTTPMiddleware):
         # Inspect URL-encoded form bodies.
         content_type = request.headers.get("content-type", "").lower()
 
+        # Form parameters check
         if (
             request.method in {"POST", "PUT", "PATCH"}
             and content_type.startswith(
@@ -94,6 +108,41 @@ class WAFMiddleware(BaseHTTPMiddleware):
                             "XSS-001",
                             "Suspicious XSS pattern in form body",
                         )
+        # Inspect JSON bodies
+        if (
+            request.method in {"POST", "PUT", "PATCH"}
+            and content_type.startswith("application/json")
+        ):
+            body = await request.body()
+
+            if len(body) > 1_000_00:
+                return block(
+                    "BODY-001",
+                    "Request body exceeds inspection limit",
+                    status_code=413,
+                )
+
+            try:
+                payload = json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return block(
+                    "BODY-002",
+                    "Malformed JSON request body",
+                    status_code=400,
+                )
+
+            for value in extract_strings(payload):
+                if detect_sql_injection(value):
+                    return block(
+                        "SQLI-001",
+                        "Suspicious SQL injection pattern in JSON body",
+                    )
+
+                if detect_xss(value):
+                    return block(
+                        "XSS-001",
+                        "Suspicious XSS pattern in JSON body",
+                    )
 
         response = await call_next(request)
 
