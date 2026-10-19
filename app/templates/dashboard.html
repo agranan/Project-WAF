@@ -122,6 +122,21 @@
                 flex-direction: column;
             }
         }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .filters select {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+            background: white;
+            min-width: 180px;
+        }
     </style>
 </head>
 
@@ -146,6 +161,19 @@
             <h3>Recent Security Events</h3>
             <button onclick="loadEvents()">Refresh</button>
         </div>
+        <div class="filters">
+            <select id="rule-filter" onchange="renderEvents()">
+                <option value="ALL">All attack types</option>
+                <option value="SQLI-001">SQL Injection</option>
+                <option value="XSS-001">XSS</option>
+                <option value="RATE-001">Rate Limit</option>
+            </select>
+
+            <select id="action-filter" onchange="renderEvents()">
+                <option value="ALL">All actions</option>
+                <option value="BLOCK">Blocked</option>
+            </select>
+        </div>
 
         <p id="status">Loading events...</p>
 
@@ -166,78 +194,98 @@
     </section>
 
     <script>
+        let allEvents = [];
+
         async function loadEvents() {
             const status = document.getElementById("status");
-            const table = document.getElementById("events-table");
 
             status.textContent = "Loading events...";
 
             try {
-                const response = await fetch("/api/events?limit=100");
+                const response = await fetch("/api/events?limit=500");
 
                 if (!response.ok) {
                     throw new Error("Failed to fetch events");
                 }
 
-                const events = await response.json();
+                allEvents = await response.json();
+                renderEvents();
 
-                document.getElementById("total-events").textContent =
-                    events.length;
-
-                document.getElementById("blocked-events").textContent =
-                    events.filter(event => event.action === "BLOCK").length;
-
-                table.replaceChildren();
-
-                if (events.length === 0) {
-                    const row = document.createElement("tr");
-                    const cell = document.createElement("td");
-
-                    cell.colSpan = 7;
-                    cell.className = "empty";
-                    cell.textContent = "No security events recorded yet.";
-
-                    row.appendChild(cell);
-                    table.appendChild(row);
-                } else {
-                    for (const event of events) {
-                        const row = document.createElement("tr");
-
-                        const values = [
-                            event.timestamp,
-                            event.source_ip,
-                            event.method,
-                            event.path,
-                            event.rule_id,
-                            event.reason,
-                            event.action
-                        ];
-
-                        for (let i = 0; i < values.length; i++) {
-                            const cell = document.createElement("td");
-                            cell.textContent = values[i] ?? "-";
-
-                            if (i === 6 && event.action === "BLOCK") {
-                                const badge = document.createElement("span");
-                                badge.className = "blocked";
-                                badge.textContent = "BLOCK";
-                                cell.replaceChildren(badge);
-                            }
-
-                            row.appendChild(cell);
-                        }
-
-                        table.appendChild(row);
-                    }
-                }
-
-                status.textContent =
-                    `Showing ${events.length} most recent events.`;
             } catch (error) {
-                status.textContent =
-                    "Could not load events. Check that the FastAPI server is running.";
+                status.textContent = "Could not load events. Check the server.";
                 console.error(error);
             }
+        }
+
+        function renderEvents() {
+            const table = document.getElementById("events-table");
+            const status = document.getElementById("status");
+
+            const selectedRule = document.getElementById("rule-filter").value;
+            const selectedAction = document.getElementById("action-filter").value;
+
+            const filteredEvents = allEvents.filter(event => {
+                const matchesRule =
+                    selectedRule === "ALL" || event.rule_id === selectedRule;
+
+                const matchesAction =
+                    selectedAction === "ALL" || event.action === selectedAction;
+
+                return matchesRule && matchesAction;
+            });
+
+            document.getElementById("total-events").textContent =
+                filteredEvents.length;
+
+            document.getElementById("blocked-events").textContent =
+                filteredEvents.filter(event => event.action === "BLOCK").length;
+
+            table.replaceChildren();
+
+            if (filteredEvents.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+
+                cell.colSpan = 7;
+                cell.className = "empty";
+                cell.textContent = "No matching security events.";
+
+                row.appendChild(cell);
+                table.appendChild(row);
+            } else {
+                for (const event of filteredEvents) {
+                    const row = document.createElement("tr");
+
+                    const values = [
+                        event.timestamp,
+                        event.source_ip,
+                        event.method,
+                        event.path,
+                        event.rule_id,
+                        event.reason,
+                        event.action
+                    ];
+
+                    for (let i = 0; i < values.length; i++) {
+                        const cell = document.createElement("td");
+                        cell.textContent = values[i] ?? "-";
+
+                        if (i === 6 && event.action === "BLOCK") {
+                            const badge = document.createElement("span");
+                            badge.className = "blocked";
+                            badge.textContent = "BLOCK";
+                            cell.replaceChildren(badge);
+                        }
+
+                        row.appendChild(cell);
+                    }
+
+                    table.appendChild(row);
+                }
+            }
+
+            status.textContent =
+                `Showing ${filteredEvents.length} of ${allEvents.length} loaded events.`;
         }
 
         loadEvents();
