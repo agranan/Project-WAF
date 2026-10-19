@@ -16,3 +16,18 @@ def detect_sql_injection(value: str) -> bool:
         pattern.search(decoded_value)
         for pattern in SQL_INJECTION_PATTERNS
     )
+
+XSS_PATTERNS = [
+    re.compile(r"<\s*script\b", re.IGNORECASE),
+    re.compile(r"\bon\w+\s*=", re.IGNORECASE),
+    re.compile(r"javascript\s*:", re.IGNORECASE),
+]
+
+
+def detect_xss(value: str) -> bool:
+    decoded_value = unquote(value)
+
+    return any(
+        pattern.search(decoded_value)
+        for pattern in XSS_PATTERNS
+    )

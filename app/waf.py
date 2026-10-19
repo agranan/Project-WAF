@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.detectors import detect_sql_injection
+from app.detectors import detect_sql_injection, detect_xss
 from app.database import log_event
 from app.rate_limiter import is_rate_limited
 
@@ -58,7 +58,26 @@ class WAFMiddleware(BaseHTTPMiddleware):
                     },
                     headers={"X-Request-ID": request_id},
                 )
+            if detect_xss(value):
+                log_event(
+                    request_id=request_id,
+                    source_ip=request.client.host if request.client else "unknown",
+                    method=request.method,
+                    path=request.url.path,
+                    rule_id="XSS-001",
+                    reason="Suspicious XSS pattern",
+                    action="BLOCK",
+                )
 
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "error": "Request blocked by WAF",
+                        "reason": "Suspicious XSS pattern",
+                        "request_id": request_id,
+                    },
+                    headers={"X-Request-ID": request_id},
+                )
         response = await call_next(request)
 
         duration_ms = round(
