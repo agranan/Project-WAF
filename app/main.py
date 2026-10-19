@@ -2,6 +2,8 @@
 from fastapi import FastAPI
 
 from app.waf import WAFMiddleware
+from app.database import init_db
+from app.routes import router
 
 app = FastAPI(
     title="Simple WAF",
@@ -10,7 +12,8 @@ app = FastAPI(
 )
 
 app.add_middleware(WAFMiddleware)
-
+init_db()
+app.include_router(router)
 
 @app.get("/health")
 async def health_check():
