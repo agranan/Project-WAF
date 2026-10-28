@@ -222,6 +222,7 @@
                 <option value="RATE-001">Rate Limit</option>
                 <option value="BODY-001">Request Body Too Large</option>
                 <option value="BODY-002">Malformed JSON</option>
+                <option value="PATH-001">Path Traversal</option>
             </select>
 
             <select id="action-filter" onchange="renderEvents()">
@@ -279,7 +280,8 @@
                 "XSS-001": 0,
                 "RATE-001": 0,
                 "BODY-001": 0,
-                "BODY-002": 0
+                "BODY-002": 0,
+                "PATH-001": 0
             };
 
             events.forEach(event => {
@@ -293,7 +295,8 @@
                 "XSS-001": "XSS",
                 "RATE-001": "Rate Limit",
                 "BODY-001": "Body Too Large",
-                "BODY-002": "Malformed JSON"
+                "BODY-002": "Malformed JSON",
+                "PATH-001": "Path Traversal"
             };
 
             const maxCount = Math.max(...Object.values(counts), 1);

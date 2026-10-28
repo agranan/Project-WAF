@@ -6,7 +6,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.detectors import detect_sql_injection, detect_xss
+from app.detectors import (
+    detect_sql_injection,
+    detect_xss,
+    detect_path_traversal,
+)
 from app.database import log_event
 from app.rate_limiter import is_rate_limited
 
@@ -52,6 +56,17 @@ class WAFMiddleware(BaseHTTPMiddleware):
                 headers={"X-Request-ID": request_id},
             )
 
+        raw_path = request.scope.get("raw_path", b"").decode(
+            "latin-1"
+        )
+
+        if detect_path_traversal(request.url.path) or detect_path_traversal(raw_path):
+            return block(
+                "PATH-001",
+                "Path traversal pattern detected",
+                status_code=403,
+            )
+
         if is_rate_limited(request):
             return block(
                 "RATE-001",
@@ -69,6 +84,13 @@ class WAFMiddleware(BaseHTTPMiddleware):
 
             if detect_xss(value):
                 return block("XSS-001", "Suspicious XSS pattern")
+
+            if detect_path_traversal(value):
+                return block(
+                    "PATH-001",
+                    "Path traversal pattern detected",
+                    status_code=403,
+                )
 
         # Inspect URL-encoded form bodies.
         content_type = request.headers.get("content-type", "").lower()
@@ -108,6 +130,13 @@ class WAFMiddleware(BaseHTTPMiddleware):
                             "XSS-001",
                             "Suspicious XSS pattern in form body",
                         )
+
+                    if detect_path_traversal(value):
+                        return block(
+                            "PATH-001",
+                            "Path traversal pattern detected",
+                            status_code=403,
+                        )
         # Inspect JSON bodies
         if (
             request.method in {"POST", "PUT", "PATCH"}
@@ -142,6 +171,13 @@ class WAFMiddleware(BaseHTTPMiddleware):
                     return block(
                         "XSS-001",
                         "Suspicious XSS pattern in JSON body",
+                    )
+
+                if detect_path_traversal(value):
+                    return block(
+                        "PATH-001",
+                        "Path traversal pattern detected",
+                        status_code=403,
                     )
 
         response = await call_next(request)
