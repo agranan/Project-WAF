@@ -82,6 +82,28 @@
             font-weight: bold;
         }
 
+        .severity-badge {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .severity-high {
+            color: #991b1b;
+            background: #fee2e2;
+        }
+
+        .severity-medium {
+            color: #92400e;
+            background: #fef3c7;
+        }
+
+        .severity-low {
+            color: #166534;
+            background: #dcfce7;
+        }
+
         .empty {
             text-align: center;
             color: #6b7280;
@@ -202,6 +224,18 @@
             <p>Blocked Requests</p>
             <h2 id="blocked-events">0</h2>
         </div>
+        <div class="stat-card">
+            <p>High Severity</p>
+            <h2 id="high-events">0</h2>
+        </div>
+        <div class="stat-card">
+            <p>Medium Severity</p>
+            <h2 id="medium-events">0</h2>
+        </div>
+        <div class="stat-card">
+            <p>Low Severity</p>
+            <h2 id="low-events">0</h2>
+        </div>
     </section>
 
     <section class="chart-container">
@@ -232,6 +266,13 @@
                 <option value="ALL">All actions</option>
                 <option value="BLOCK">Blocked</option>
             </select>
+
+            <select id="severity-filter" onchange="renderEvents()">
+                <option value="ALL">All severity levels</option>
+                <option value="High">High severity</option>
+                <option value="Medium">Medium severity</option>
+                <option value="Low">Low severity</option>
+            </select>
         </div>
 
         <p id="status">Loading events...</p>
@@ -244,6 +285,7 @@
                     <th>Method</th>
                     <th>Endpoint</th>
                     <th>Rule</th>
+                    <th>Severity</th>
                     <th>Reason</th>
                     <th>Action</th>
                 </tr>
@@ -341,7 +383,8 @@
 
             const selectedRule = document.getElementById("rule-filter").value;
             const selectedAction = document.getElementById("action-filter").value;
-            
+            const selectedSeverity = document.getElementById("severity-filter").value;
+
             renderAttackChart(allEvents);
 
             const filteredEvents = allEvents.filter(event => {
@@ -350,8 +393,10 @@
 
                 const matchesAction =
                     selectedAction === "ALL" || event.action === selectedAction;
+                const matchesSeverity =
+                    selectedSeverity === "ALL" || event.severity === selectedSeverity;
 
-                return matchesRule && matchesAction;
+                return matchesRule && matchesAction && matchesSeverity;
             });
 
             document.getElementById("total-events").textContent =
@@ -359,6 +404,12 @@
 
             document.getElementById("blocked-events").textContent =
                 filteredEvents.filter(event => event.action === "BLOCK").length;
+            document.getElementById("high-events").textContent =
+                filteredEvents.filter(event => event.severity === "High").length;
+            document.getElementById("medium-events").textContent =
+                filteredEvents.filter(event => event.severity === "Medium").length;
+            document.getElementById("low-events").textContent =
+                filteredEvents.filter(event => event.severity === "Low").length;
 
             table.replaceChildren();
 
@@ -366,7 +417,7 @@
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
 
-                cell.colSpan = 7;
+                cell.colSpan = 8;
                 cell.className = "empty";
                 cell.textContent = "No matching security events.";
 
@@ -382,6 +433,7 @@
                         event.method,
                         event.path,
                         event.rule_id,
+                        event.severity,
                         event.reason,
                         event.action
                     ];
@@ -390,7 +442,15 @@
                         const cell = document.createElement("td");
                         cell.textContent = values[i] ?? "-";
 
-                        if (i === 6 && event.action === "BLOCK") {
+                        if (i === 5) {
+                            const severity = (event.severity || "Low").toLowerCase();
+                            const badge = document.createElement("span");
+                            badge.className = `severity-badge severity-${severity}`;
+                            badge.textContent = event.severity || "Low";
+                            cell.replaceChildren(badge);
+                        }
+
+                        if (i === 7 && event.action === "BLOCK") {
                             const badge = document.createElement("span");
                             badge.className = "blocked";
                             badge.textContent = "BLOCK";
