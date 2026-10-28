@@ -225,6 +225,7 @@
                 <option value="BODY-002">Malformed JSON</option>
                 <option value="PATH-001">Path Traversal</option>
                 <option value="CMD-001">Command Injection</option>
+                <option value="AUTH-001">Login blocked</option>
             </select>
 
             <select id="action-filter" onchange="renderEvents()">
@@ -285,7 +286,8 @@
                 "BODY-001": 0,
                 "BODY-002": 0,
                 "PATH-001": 0,
-                "CMD-001": 0
+                "CMD-001": 0,
+                "AUTH-001": 0
             };
 
             events.forEach(event => {
@@ -302,7 +304,8 @@
                 "BODY-001": "Body Too Large",
                 "BODY-002": "Malformed JSON",
                 "PATH-001": "Path Traversal",
-                "CMD-001": "Command Injection"
+                "CMD-001": "Command Injection",
+                "AUTH-001": "Login blocked"
             };
 
             const maxCount = Math.max(...Object.values(counts), 1);
