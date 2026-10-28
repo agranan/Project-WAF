@@ -10,10 +10,14 @@ from app.detectors import (
     detect_sql_injection,
     detect_xss,
     detect_path_traversal,
+    detect_command_injection,
 )
 from app.database import log_event
-from app.rate_limiter import is_rate_limited
-
+from app.rate_limiter import (
+    is_rate_limited,
+    is_ip_banned,
+    record_rate_limit_violation,
+)
 import json
 
 def extract_strings(value):
@@ -60,6 +64,7 @@ class WAFMiddleware(BaseHTTPMiddleware):
             "latin-1"
         )
 
+        # If request itself has path traversal
         if detect_path_traversal(request.url.path) or detect_path_traversal(raw_path):
             return block(
                 "PATH-001",
@@ -67,12 +72,37 @@ class WAFMiddleware(BaseHTTPMiddleware):
                 status_code=403,
             )
 
+        # if is_rate_limited(request):
+        #     return block(
+        #         "RATE-001",
+        #         "Request rate limit exceeded",
+        #         status_code=429,
+        #     )
+        # Check for an active temporary ban first.
+        if is_ip_banned(request):
+            return block(
+                "RATE-002",
+                "IP temporarily banned after repeated rate-limit violations",
+                status_code=403,
+            )
+
+        # Check the normal request rate limit.
         if is_rate_limited(request):
+            ban_applied = record_rate_limit_violation(request)
+
+            if ban_applied:
+                return block(
+                    "RATE-002",
+                    "IP temporarily banned after repeated rate-limit violations",
+                    status_code=403,
+                )
+
             return block(
                 "RATE-001",
                 "Request rate limit exceeded",
                 status_code=429,
             )
+
 
         # Inspect query parameters.
         for _, value in request.query_params.multi_items():
@@ -89,6 +119,13 @@ class WAFMiddleware(BaseHTTPMiddleware):
                 return block(
                     "PATH-001",
                     "Path traversal pattern detected",
+                    status_code=403,
+                )
+
+            if detect_command_injection(value):
+                return block(
+                    "CMD-001",
+                    "Command injection pattern detected",
                     status_code=403,
                 )
 
@@ -137,6 +174,13 @@ class WAFMiddleware(BaseHTTPMiddleware):
                             "Path traversal pattern detected",
                             status_code=403,
                         )
+
+                    if detect_command_injection(value):
+                        return block(
+                            "CMD-001",
+                            "Command injection pattern detected",
+                            status_code=403,
+                        )
         # Inspect JSON bodies
         if (
             request.method in {"POST", "PUT", "PATCH"}
@@ -177,6 +221,13 @@ class WAFMiddleware(BaseHTTPMiddleware):
                     return block(
                         "PATH-001",
                         "Path traversal pattern detected",
+                        status_code=403,
+                    )
+
+                if detect_command_injection(value):
+                    return block(
+                        "CMD-001",
+                        "Command injection pattern detected",
                         status_code=403,
                     )
 

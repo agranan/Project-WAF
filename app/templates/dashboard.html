@@ -220,9 +220,11 @@
                 <option value="SQLI-001">SQL Injection</option>
                 <option value="XSS-001">XSS</option>
                 <option value="RATE-001">Rate Limit</option>
+                <option value="RATE-002">Temperory Ban</option>
                 <option value="BODY-001">Request Body Too Large</option>
                 <option value="BODY-002">Malformed JSON</option>
                 <option value="PATH-001">Path Traversal</option>
+                <option value="CMD-001">Command Injection</option>
             </select>
 
             <select id="action-filter" onchange="renderEvents()">
@@ -279,9 +281,11 @@
                 "SQLI-001": 0,
                 "XSS-001": 0,
                 "RATE-001": 0,
+                "RATE-002": 0,
                 "BODY-001": 0,
                 "BODY-002": 0,
-                "PATH-001": 0
+                "PATH-001": 0,
+                "CMD-001": 0
             };
 
             events.forEach(event => {
@@ -294,9 +298,11 @@
                 "SQLI-001": "SQL Injection",
                 "XSS-001": "XSS",
                 "RATE-001": "Rate Limit",
+                "RATE-002": "Temporary Ban",
                 "BODY-001": "Body Too Large",
                 "BODY-002": "Malformed JSON",
-                "PATH-001": "Path Traversal"
+                "PATH-001": "Path Traversal",
+                "CMD-001": "Command Injection"
             };
 
             const maxCount = Math.max(...Object.values(counts), 1);
